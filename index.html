@@ -19,15 +19,14 @@
 
   <!-- Firebase 設定 (請在這裡填入你的設定) -->
   <script>
-    // 加入判斷，避免覆蓋掉預覽環境自動提供的設定
     if (typeof window.__firebase_config === 'undefined') {
       window.__firebase_config = JSON.stringify({
-        apiKey: "AIzaSyBuAASovfUiULcZSAxLYoTxFcx4bhZC0QY",
-        authDomain: "pokemon-log-7fd7b.firebaseapp.com",
-        projectId: "pokemon-log-7fd7b",
-        storageBucket: "pokemon-log-7fd7b.firebasestorage.app",
-        messagingSenderId: "569646310309",
-        appId: "1:569646310309:web:ef63bc9656304bf137fe4c"
+        apiKey: "請換成你的_API_KEY",
+        authDomain: "請換成你的_AUTH_DOMAIN",
+        projectId: "請換成你的_PROJECT_ID",
+        storageBucket: "請換成你的_STORAGE_BUCKET",
+        messagingSenderId: "請換成你的_MESSAGING_SENDER_ID",
+        appId: "請換成你的_APP_ID"
       });
     }
     if (typeof window.__app_id === 'undefined') {
@@ -39,14 +38,13 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { Calendar, BookOpen, Plus, ChevronLeft, ChevronRight, Save, Trash2, Cloud, Flame, Zap, Shield } from 'https://esm.sh/lucide-react@0.300.0';
+    import { Calendar, BookOpen, Plus, ChevronLeft, ChevronRight, Save, Trash2, Cloud, Flame, Zap, Shield, LogOut } from 'https://esm.sh/lucide-react@0.300.0';
     
-    // 將 Firebase 模組替換為官方 gstatic 來源
+    // 引入 Firebase 相關模組 (新增了 GoogleAuthProvider, signInWithPopup, signOut)
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
     import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-    // --- 這裡放入最新的所有邏輯 ---
     let app, auth, db;
     let isFirebaseInitialized = false;
 
@@ -54,7 +52,6 @@
       if (isFirebaseInitialized) return true;
       try {
         const firebaseConfig = JSON.parse(configStr);
-        // 若還是假字串，則拒絕初始化，交由 UI 處理
         if (firebaseConfig.apiKey === "請換成你的_API_KEY") return false;
 
         app = initializeApp(firebaseConfig);
@@ -69,7 +66,6 @@
     };
 
     let initialConfig = null;
-    // 優先使用系統提供的設定（如果不是假字串的話）
     if (typeof window.__firebase_config !== 'undefined' && !window.__firebase_config.includes("請換成你的_API_KEY")) {
       initialConfig = window.__firebase_config;
     } else {
@@ -110,6 +106,7 @@
 
     const POKE_IMAGES = {
       pikachu: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png",
+      eevee: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/133.png",
       meowth: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/052.png",
       snorlax: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/143.png",
       lucario: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/448.png",
@@ -119,10 +116,11 @@
     };
 
     function App() {
-      const [user, setUser] = useState(null);
+      const [user, setUser] = useState(undefined); // undefined 代表載入中
       const [needsConfig, setNeedsConfig] = useState(!isFirebaseInitialized);
       const [configInput, setConfigInput] = useState('');
       const [setupError, setSetupError] = useState('');
+      const [systemMessage, setSystemMessage] = useState(''); 
       
       const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
       const [activeTab, setActiveTab] = useState('accounting'); 
@@ -141,34 +139,44 @@
 
       const appId = window.__app_id || 'pokemon-log-app';
 
+      // Auth 監聽與登入邏輯
       useEffect(() => {
         if (!isFirebaseInitialized) return;
-        const initAuth = async () => {
-          try {
-            // 自動偵測預覽環境的 Token 並優先使用，避免 Network Request 錯誤
-            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-              await signInWithCustomToken(auth, window.__initial_auth_token);
-            } else if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await signInWithCustomToken(auth, __initial_auth_token);
+
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+          if (currentUser) {
+            setUser(currentUser);
+          } else {
+            // 嘗試抓取 Canvas 預覽環境的授權 Token (避免預覽畫面破圖)
+            const token = window.__initial_auth_token || (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null);
+            if (token) {
+              try {
+                await signInWithCustomToken(auth, token);
+              } catch (e) {
+                setUser(null); // Token 無效則顯示登入畫面
+              }
             } else {
-              await signInAnonymously(auth);
+              // 一般 Vercel 環境且未登入 -> 顯示 Google 登入畫面
+              setUser(null);
             }
-          } catch (error) {
-            console.error("登入失敗:", error);
           }
-        };
-        initAuth();
-        const unsubscribe = onAuthStateChanged(auth, setUser);
+        });
         return () => unsubscribe();
       }, [needsConfig]);
 
+      // 資料抓取
       useEffect(() => {
         if (!user || !isFirebaseInitialized) return;
+        
         const expensesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
         const unsubExpenses = onSnapshot(expensesRef, (snapshot) => {
           const expensesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           setAllExpenses(expensesData);
-        }, (error) => console.error("讀取花費失敗:", error));
+          setSystemMessage(''); // 成功讀取清空錯誤
+        }, (error) => {
+          console.error("讀取花費失敗:", error);
+          setSystemMessage("讀取失敗：請檢查 Firebase 資料庫規則！");
+        });
 
         const diaryRef = collection(db, 'artifacts', appId, 'users', user.uid, 'diary');
         const unsubDiary = onSnapshot(diaryRef, (snapshot) => {
@@ -201,6 +209,27 @@
         monthExpenses.forEach(e => { stats[e.type] = (stats[e.type] || 0) + e.amount; total += e.amount; });
         return { stats, total };
       }, [allExpenses, currentDate]);
+
+      // === Google 登入與登出處理 ===
+      const handleGoogleLogin = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (error) {
+          console.error("Google 登入失敗:", error);
+          setSystemMessage("登入失敗，請確認 Firebase 設定已加入網域白名單！");
+        }
+      };
+
+      const handleLogout = async () => {
+        if(confirm("確定要登出並離開手帳嗎？")) {
+          try {
+            await signOut(auth);
+          } catch (error) {
+            console.error("登出失敗:", error);
+          }
+        }
+      };
 
       const handleSaveConfig = () => {
         try {
@@ -249,7 +278,7 @@
             <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full border-4 border-yellow-300">
               <div className="text-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2"><Cloud className="text-blue-500" /> 連結雲端背包</h1>
-                <p className="text-gray-600">看來你是第一次使用！請輸入你的 Firebase 設定檔 (JSON格式) 來啟用雲端儲存功能。</p>
+                <p className="text-gray-600">請輸入你的 Firebase 設定檔 (JSON格式) 來啟用雲端儲存功能。</p>
               </div>
               <textarea className="w-full h-48 p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 resize-none font-mono text-sm" placeholder={'{\n  "apiKey": "...",\n  "authDomain": "...",\n  "projectId": "..."\n}'} value={configInput} onChange={(e) => setConfigInput(e.target.value)} />
               {setupError && <p className="text-red-500 mt-2 text-sm">{setupError}</p>}
@@ -259,10 +288,44 @@
         );
       }
 
-      if (!user) {
-        return <div className="min-h-screen flex items-center justify-center bg-yellow-50 font-bold text-yellow-800 text-xl">載入冒險資料中...</div>;
+      // 如果尚未登入 (且載入完畢)，顯示專屬的登入畫面
+      if (user === null) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-blue-50 flex items-center justify-center p-4 font-sans">
+            <div className="bg-white/90 backdrop-blur-md p-10 rounded-3xl shadow-2xl max-w-md w-full border-4 border-yellow-400 text-center relative overflow-hidden">
+              <img src={POKE_IMAGES.eevee} className="absolute -bottom-6 -right-6 w-32 h-32 opacity-20 object-contain pointer-events-none" />
+              
+              <div className="flex justify-center mb-6 relative z-10">
+                <img src={POKE_IMAGES.pikachu} className="w-32 h-32 object-contain drop-shadow-lg transform hover:scale-110 transition-transform" />
+              </div>
+              
+              <h1 className="text-3xl font-extrabold text-gray-800 mb-2 relative z-10">寶可夢大師手帳</h1>
+              <p className="text-gray-500 mb-8 font-medium relative z-10">登入專屬帳號，冒險紀錄永遠跟著你！</p>
+              
+              {systemMessage && (
+                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-xl text-sm font-bold relative z-10">
+                  {systemMessage}
+                </div>
+              )}
+
+              <button 
+                onClick={handleGoogleLogin} 
+                className="w-full bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-4 px-6 rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center gap-3 relative z-10"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+                使用 Google 帳號登入
+              </button>
+            </div>
+          </div>
+        );
       }
 
+      // 如果還在等待 Firebase 驗證狀態
+      if (user === undefined) {
+        return <div className="min-h-screen flex items-center justify-center bg-yellow-50 font-bold text-yellow-800 text-xl"><img src={POKE_IMAGES.pokeball} className="w-12 h-12 animate-spin mr-3 opacity-80" /> 讀取冒險資料中...</div>;
+      }
+
+      // 已登入的主畫面
       return (
         <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-blue-50 p-4 md:p-8">
           <div className="max-w-6xl mx-auto space-y-6">
@@ -271,8 +334,13 @@
                 <img src={POKE_IMAGES.pikachu} alt="Pikachu" className="w-16 h-16 object-contain transform hover:scale-110 transition-transform drop-shadow-md" />
                 <h1 className="text-2xl md:text-4xl font-extrabold text-gray-800 tracking-wide">冒險者的手帳</h1>
               </div>
-              <div className="flex items-center">
-                <img src={POKE_IMAGES.pokeball} alt="Pokeball" className="w-10 h-10 object-contain opacity-80 animate-bounce" style={{ animationDuration: '2s' }} />
+              <div className="flex items-center gap-4">
+                {/* 加上登出按鈕 */}
+                <button onClick={handleLogout} className="flex items-center justify-center p-2 md:px-4 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-500 rounded-xl transition-colors font-bold text-sm" title="登出">
+                  <LogOut className="w-5 h-5 md:mr-2" />
+                  <span className="hidden md:inline">登出</span>
+                </button>
+                <img src={POKE_IMAGES.pokeball} alt="Pokeball" className="w-10 h-10 object-contain opacity-80 animate-bounce hidden sm:block" style={{ animationDuration: '2s' }} />
               </div>
             </header>
 
@@ -365,6 +433,11 @@
                             <label className="block text-sm font-semibold text-gray-600 mb-1">備註 (選填)</label>
                             <input type="text" value={note} onChange={(e) => setNote(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-yellow-400 focus:bg-white transition-colors" placeholder="買了什麼好東西？" />
                           </div>
+                          {systemMessage && (
+                            <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-xl font-bold text-sm shadow-sm flex items-center gap-2">
+                              <span>⚠️</span> {systemMessage}
+                            </div>
+                          )}
                           <button type="submit" className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><Save className="w-5 h-5" /> 記錄到背包</button>
                         </form>
                       </div>
