@@ -14,6 +14,11 @@
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
     .hide-scroll::-webkit-scrollbar { display: none; }
     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* 終極日曆網格邊框樣式 (精準對齊法) */
+    .calendar-wrapper { border-top: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; }
+    /* 強制設定 min-width 防止內容過長撐破網格導致線條錯位 */
+    .calendar-cell { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; min-width: 0; }
   </style>
 </head>
 <body class="overflow-hidden"> <!-- 隱藏外層滾動條，打造 App 體驗 -->
@@ -90,9 +95,9 @@
 
     // 星期與對應寶可夢 (神獸與超級進化豪華陣容)
     const WEEKDAYS = [
-      { tw: '週日', color: 'text-red-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png' }, // 烈空坐
+      { tw: '週日', color: 'text-red-500', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png' }, // 烈空坐
       { tw: '週一', color: 'text-gray-700', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/197.png' }, // 月亮伊布
-      { tw: '週二', color: 'text-red-500', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10035.png' }, // 超級噴火龍Y
+      { tw: '週二', color: 'text-red-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10035.png' }, // 超級噴火龍Y
       { tw: '週三', color: 'text-blue-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10033.png' }, // 超級水箭龜
       { tw: '週四', color: 'text-green-700', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10032.png' }, // 超級妙蛙花
       { tw: '週五', color: 'text-yellow-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10059.png' }, // 超級路卡利歐
@@ -348,7 +353,7 @@
             {/* 左側：全螢幕 Google 日曆風格 */}
             <div className="flex-1 flex flex-col bg-white overflow-hidden relative shadow-sm z-10">
               
-              {/* 絕對居中的浮水印寶可夢 (保證不被遮擋) */}
+              {/* 絕對居中的浮水印寶可夢 */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <img src={MONTHLY_POKEMON[calMonth]} className="w-64 h-64 md:w-[400px] md:h-[400px] opacity-15 object-contain transition-all duration-500 drop-shadow-sm" />
               </div>
@@ -365,12 +370,11 @@
                 </div>
               </div>
               
-              {/* 日曆網格主體 (100% 精準對齊法) */}
+              {/* 日曆網格主體 (統一邊框絕對對齊) */}
               <div className="flex-1 overflow-auto custom-scrollbar bg-white/60 backdrop-blur-[1px] relative z-10 p-2 md:p-4">
-                {/* 加上最外層的邊框，確保表格完整 */}
                 <div className="min-w-[600px] lg:min-w-full flex flex-col h-full border-t border-l border-gray-200 bg-white/40">
                   
-                  {/* 星期標題區塊 - 使用 Sticky 固定，並與下方格子完美對齊 */}
+                  {/* 星期標題區塊 - 使用 Sticky 固定 */}
                   <div className="grid grid-cols-7 flex-shrink-0 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-sm border-b border-gray-200">
                     {WEEKDAYS.map((day, idx) => (
                       <div key={`header-${idx}`} className={`border-r border-gray-200 flex flex-col xl:flex-row items-center justify-center py-2 lg:py-3 gap-1 md:gap-2 ${day.color}`}>
@@ -380,7 +384,7 @@
                     ))}
                   </div>
                   
-                  {/* 日期格子區塊 (自動依照週數展開) */}
+                  {/* 日期格子區塊 */}
                   <div 
                     className="grid grid-cols-7 flex-1"
                     style={{ gridTemplateRows: `repeat(${numWeeks}, minmax(120px, 1fr))` }}
@@ -403,10 +407,15 @@
                       const dayExpenses = allExpenses.filter(e => e.date === dateStr);
                       const dayDiary = allDiaries.find(d => d.date === dateStr);
                       
-                      // 篩選非例行性待辦
-                      const allTasks = dayDiary && dayDiary.text ? dayDiary.text.split('\n').filter(t => t.trim() !== '') : [];
-                      const nonRoutineTasks = allTasks.filter(task => !ROUTINE_TASKS.some(routine => task.includes(routine)));
+                      // 篩選非例行性待辦 (提取純日記內容)
+                      let pureDiaryText = '';
+                      if (dayDiary && dayDiary.text) {
+                        const lines = dayDiary.text.split('\n').map(t => t.trim()).filter(t => t !== '');
+                        const filteredLines = lines.filter(line => !ROUTINE_TASKS.some(routine => line.includes(routine)));
+                        pureDiaryText = filteredLines.join(' ');
+                      }
 
+                      // 決定背景顏色 
                       let cellBg = 'bg-transparent';
                       if (isSelected) {
                         cellBg = 'bg-blue-100/70';
@@ -421,7 +430,7 @@
                       return (
                         <div key={day} onClick={() => { 
                           setCurrentDate(dateStr); 
-                          // 防呆：如果當天是完全空白的，點下去不彈窗，只會選取該日
+                          // 點擊防呆：只有當天有資料，才彈出詳細視窗
                           if (dayExpenses.length > 0 || (dayDiary && dayDiary.text.trim() !== '')) {
                             setShowDayModal(true); 
                           }
@@ -436,21 +445,17 @@
                             <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white shadow-md' : numColor}`}>{day}</span>
                           </div>
                           
-                          {/* 內容區塊：只顯示前 4 個非例行待辦 (記帳完全不顯示，只在總覽顯示) */}
-                          <div className="flex-1 overflow-hidden flex flex-col gap-1.5 min-w-0 w-full">
-                            {nonRoutineTasks.slice(0, 4).map((task, idx) => (
-                              <div key={`task-${idx}`} className="bg-blue-500 text-white text-[10px] md:text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate shadow-sm w-full">
-                                {task}
+                          {/* 內容區塊：只顯示純日記內容，隱藏所有記帳與例行待辦標籤 */}
+                          <div className="flex-1 overflow-hidden flex flex-col gap-1 min-w-0 w-full mt-1">
+                            {pureDiaryText && (
+                              <div 
+                                className="border-l-2 border-blue-400 pl-1.5 text-[10px] md:text-[11px] lg:text-xs text-gray-700 font-bold leading-tight break-words overflow-hidden text-ellipsis"
+                                style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' }}
+                                title={pureDiaryText}
+                              >
+                                {pureDiaryText}
                               </div>
-                            ))}
-                            {nonRoutineTasks.length > 4 && <div className="text-[9px] text-blue-600 font-bold px-1 tracking-wider flex-shrink-0">...還有更多</div>}
-                            
-                            {/* 顯示記帳的微小提示 (隱藏金額，只顯示種類) */}
-                            {dayExpenses.map(e => (
-                              <div key={e.id} className={`text-[10px] md:text-[11px] font-bold px-1.5 py-0.5 rounded-md truncate shadow-sm bg-white/95 w-full ${e.transactionMode === 'income' ? 'text-green-700' : 'text-red-600'}`}>
-                                💰 {e.type}
-                              </div>
-                            ))}
+                            )}
                           </div>
                         </div>
                       );
