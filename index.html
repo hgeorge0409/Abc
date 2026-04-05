@@ -8,40 +8,46 @@
   <!-- 載入 Babel 以便在瀏覽器中編譯 JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+    .hide-scroll::-webkit-scrollbar { display: none; }
+    .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* 終極日曆網格邊框樣式 (精準對齊法) */
+    .calendar-wrapper { border-top: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; }
+    /* 強制設定 min-width 防止內容過長撐破網格導致線條錯位 */
+    .calendar-cell { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; min-width: 0; }
   </style>
 </head>
-<body>
+<body class="overflow-hidden"> <!-- 隱藏外層滾動條，打造 App 體驗 -->
   <div id="root"></div>
 
-  <!-- Firebase 設定 (請在這裡填入你的設定) -->
+  <!-- Firebase 設定 -->
   <script>
     if (typeof window.__firebase_config === 'undefined') {
       window.__firebase_config = JSON.stringify({
-          apiKey: "AIzaSyBuAASovfUiULcZSAxLYoTxFcx4bhZC0QY",
-          authDomain: "pokemon-log-7fd7b.firebaseapp.com",
-          projectId: "pokemon-log-7fd7b",
-          storageBucket: "pokemon-log-7fd7b.firebasestorage.app",
-          messagingSenderId: "569646310309",
-          appId: "1:569646310309:web:ef63bc9656304bf137fe4c",
-          measurementId: "G-9ZFZ74CDW9"
+        apiKey: "AIzaSyBuAASovfUiULcZSAxLYoTxFcx4bhZC0QY",
+        authDomain: "pokemon-log-7fd7b.firebaseapp.com",
+        projectId: "pokemon-log-7fd7b",
+        storageBucket: "pokemon-log-7fd7b.firebasestorage.app",
+        messagingSenderId: "569646310309",
+        appId: "1:569646310309:web:ef63bc9656304bf137fe4c",
+        measurementId: "G-9ZFZ74CDW9"
       });
     }
     if (typeof window.__app_id === 'undefined') {
-      window.__app_id = "pokemon-log-vercel-app"; 
+      window.__app_id = "pokemon-log-7fd7b"; 
     }
   </script>
 
-  <!-- 使用原生 ES 模組載入所有 React 與 Firebase 模組 -->
+  <!-- 使用原生 ES 模組載入 -->
   <script type="text/babel" data-type="module">
     import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { Calendar, BookOpen, Plus, ChevronLeft, ChevronRight, Save, Trash2, Cloud, Flame, Zap, Shield, LogOut, Download, FileSpreadsheet } from 'https://esm.sh/lucide-react@0.300.0';
+    import { Calendar, BookOpen, Plus, ChevronLeft, ChevronRight, Save, Trash2, Cloud, Flame, Zap, Shield, LogOut, FileSpreadsheet, CheckCircle2, X } from 'https://esm.sh/lucide-react@0.300.0';
     
-    // 引入 Firebase 相關模組 (新增了 GoogleAuthProvider, signInWithPopup, signOut)
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
     import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
@@ -72,7 +78,6 @@
     } else {
       initialConfig = localStorage.getItem('pokemon_firebase_config');
     }
-
     if (initialConfig) initFirebase(initialConfig);
 
     const TAIWAN_HOLIDAYS_MAP = {
@@ -88,6 +93,17 @@
     };
     const LUNAR_FIFTEENTH = ['2026-01-04', '2026-02-02', '2026-03-03', '2026-04-02', '2026-05-01', '2026-05-31', '2026-06-29', '2026-07-28', '2026-08-27', '2026-09-25', '2026-10-24', '2026-11-23', '2026-12-22'];
 
+    // 星期與對應寶可夢 (神獸與超級進化豪華陣容)
+    const WEEKDAYS = [
+      { tw: '週日', color: 'text-red-500', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png' }, // 烈空坐
+      { tw: '週一', color: 'text-gray-700', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/197.png' }, // 月亮伊布
+      { tw: '週二', color: 'text-red-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10035.png' }, // 超級噴火龍Y
+      { tw: '週三', color: 'text-blue-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10033.png' }, // 超級水箭龜
+      { tw: '週四', color: 'text-green-700', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10032.png' }, // 超級妙蛙花
+      { tw: '週五', color: 'text-yellow-600', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10059.png' }, // 超級路卡利歐
+      { tw: '週六', color: 'text-amber-800', poke: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10044.png' }  // 超級超夢Y
+    ];
+
     const MONTHLY_POKEMON = [
       "https://assets.pokemon.com/assets/cms2/img/pokedex/full/144.png", "https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png", 
       "https://assets.pokemon.com/assets/cms2/img/pokedex/full/001.png", "https://assets.pokemon.com/assets/cms2/img/pokedex/full/175.png", 
@@ -102,11 +118,10 @@
       { name: '午餐', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/083.png', color: 'bg-orange-100 text-orange-800' },
       { name: '晚餐', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/108.png', color: 'bg-red-100 text-red-800' },
       { name: '飲品', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/007.png', color: 'bg-blue-100 text-blue-800' },
-      { name: '停車費', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/185.png', color: 'bg-gray-200 text-gray-800' },
+      { name: '停車', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/185.png', color: 'bg-gray-200 text-gray-800' },
       { name: '卡費', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/054.png', color: 'bg-purple-100 text-purple-800' },
       { name: '交通', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/131.png', color: 'bg-teal-100 text-teal-800' },
-      { name: '娛樂', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/039.png', color: 'bg-pink-100 text-pink-800' },
-      { name: '其他', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/132.png', color: 'bg-slate-100 text-slate-800' }
+      { name: '娛樂', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/039.png', color: 'bg-pink-100 text-pink-800' }
     ];
 
     const INCOME_CATEGORIES = [
@@ -116,7 +131,7 @@
       { name: '其他', icon: 'https://assets.pokemon.com/assets/cms2/img/pokedex/full/132.png', color: 'bg-slate-100 text-slate-800' }
     ];
 
-    const ROUTINE_TASKS = ['🚗 送兒子上學', '🏫 接兒子下課', '🍽️ 洗碗', '🗑️ 倒垃圾', '🐈 鏟貓砂', '🧺 洗衣服', '☀️ 曬衣服'];
+    const ROUTINE_TASKS = ['🚗 送兒子上學', '🏫 接兒子下課', '🍽️ 洗碗', '🗑️ 倒垃圾', '🐈 鏟貓砂', '🧺 洗衣服', '☀️ 曬衣服', '💪 運動健身'];
 
     const POKE_IMAGES = {
       pikachu: "https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png",
@@ -130,7 +145,7 @@
     };
 
     function App() {
-      const [user, setUser] = useState(undefined); // undefined 代表載入中
+      const [user, setUser] = useState(undefined); 
       const [needsConfig, setNeedsConfig] = useState(!isFirebaseInitialized);
       const [configInput, setConfigInput] = useState('');
       const [setupError, setSetupError] = useState('');
@@ -142,7 +157,7 @@
       const [calYear, setCalYear] = useState(new Date().getFullYear());
       const [calMonth, setCalMonth] = useState(new Date().getMonth());
 
-      const [transactionMode, setTransactionMode] = useState('expense'); // 'expense' 或 'income'
+      const [transactionMode, setTransactionMode] = useState('expense'); 
       const [amount, setAmount] = useState('');
       const [type, setType] = useState('午餐');
       const [note, setNote] = useState('');
@@ -151,27 +166,23 @@
 
       const [allExpenses, setAllExpenses] = useState([]);
       const [allDiaries, setAllDiaries] = useState([]);
+      
+      const [showDayModal, setShowDayModal] = useState(false);
 
       const appId = window.__app_id || 'pokemon-log-app';
 
-      // Auth 監聽與登入邏輯
+      // Auth 監聽
       useEffect(() => {
         if (!isFirebaseInitialized) return;
-
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
           if (currentUser) {
             setUser(currentUser);
           } else {
-            // 嘗試抓取 Canvas 預覽環境的授權 Token (避免預覽畫面破圖)
             const token = window.__initial_auth_token || (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null);
             if (token) {
-              try {
-                await signInWithCustomToken(auth, token);
-              } catch (e) {
-                setUser(null); // Token 無效則顯示登入畫面
-              }
+              try { await signInWithCustomToken(auth, token); } 
+              catch (e) { setUser(null); }
             } else {
-              // 一般 Vercel 環境且未登入 -> 顯示 Google 登入畫面
               setUser(null);
             }
           }
@@ -182,22 +193,18 @@
       // 資料抓取
       useEffect(() => {
         if (!user || !isFirebaseInitialized) return;
-        
         const expensesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
         const unsubExpenses = onSnapshot(expensesRef, (snapshot) => {
           const expensesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           setAllExpenses(expensesData);
-          setSystemMessage(''); // 成功讀取清空錯誤
-        }, (error) => {
-          console.error("讀取花費失敗:", error);
-          setSystemMessage("讀取失敗：請檢查 Firebase 資料庫規則！");
-        });
+          setSystemMessage(''); 
+        }, (error) => setSystemMessage("讀取失敗：請檢查 Firebase 資料庫規則！"));
 
         const diaryRef = collection(db, 'artifacts', appId, 'users', user.uid, 'diary');
         const unsubDiary = onSnapshot(diaryRef, (snapshot) => {
           const diaryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           setAllDiaries(diaryData);
-        }, (error) => console.error("讀取日記失敗:", error));
+        }, (error) => console.error("讀取日記失敗"));
 
         return () => { unsubExpenses(); unsubDiary(); };
       }, [user]);
@@ -234,7 +241,7 @@
       }, [allExpenses, currentDate]);
 
       const handleExportCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // 讓 Google 試算表能正確讀取中文
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
         csvContent += "日期,收支,分類,金額,備註\n";
         allExpenses.sort((a, b) => a.createdAt - b.createdAt).forEach(e => {
             const mode = e.transactionMode === 'income' ? '收入' : '支出';
@@ -249,38 +256,15 @@
         document.body.removeChild(link);
       };
 
-      // === Google 登入與登出處理 ===
       const handleGoogleLogin = async () => {
         const provider = new GoogleAuthProvider();
-        try {
-          await signInWithPopup(auth, provider);
-        } catch (error) {
-          console.error("Google 登入失敗:", error);
-          setSystemMessage("登入失敗，請確認 Firebase 設定已加入網域白名單！");
-        }
+        try { await signInWithPopup(auth, provider); } 
+        catch (error) { setSystemMessage("登入失敗，請確認 Firebase 設定！"); }
       };
 
       const handleLogout = async () => {
         if(confirm("確定要登出並離開手帳嗎？")) {
-          try {
-            await signOut(auth);
-          } catch (error) {
-            console.error("登出失敗:", error);
-          }
-        }
-      };
-
-      const handleSaveConfig = () => {
-        try {
-          const parsed = JSON.parse(configInput);
-          if (parsed.apiKey && parsed.projectId) {
-            localStorage.setItem('pokemon_firebase_config', JSON.stringify(parsed));
-            window.location.reload();
-          } else {
-            setSetupError('設定檔格式不正確，請確認包含 apiKey 與 projectId。');
-          }
-        } catch (e) {
-          setSetupError('請輸入有效的 JSON 格式！');
+          try { await signOut(auth); } catch (error) {}
         }
       };
 
@@ -292,13 +276,13 @@
           const newDocRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'));
           await setDoc(newDocRef, newExpense);
           setAmount(''); setNote('');
-        } catch (error) { console.error("新增花費失敗:", error); }
+        } catch (error) {}
       };
 
       const handleDeleteExpense = async (id) => {
         if (!user) return;
         try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'expenses', id)); } 
-        catch (error) { console.error("刪除花費失敗:", error); }
+        catch (error) {}
       };
 
       const handleSaveDiary = async () => {
@@ -307,105 +291,97 @@
         try {
           const diaryDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'diary', currentDate);
           await setDoc(diaryDocRef, { date: currentDate, text: diaryText, updatedAt: Date.now() });
-          setTimeout(() => setIsSavingDiary(false), 800);
-        } catch (error) { console.error("儲存日記失敗:", error); setIsSavingDiary(false); }
+          setTimeout(() => setIsSavingDiary(false), 500);
+        } catch (error) { setIsSavingDiary(false); }
       };
 
-      if (needsConfig) {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-yellow-100 via-orange-50 to-blue-100 flex items-center justify-center p-4 font-sans">
-            <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full border-4 border-yellow-300">
-              <div className="text-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2"><Cloud className="text-blue-500" /> 連結雲端背包</h1>
-                <p className="text-gray-600">請輸入你的 Firebase 設定檔 (JSON格式) 來啟用雲端儲存功能。</p>
-              </div>
-              <textarea className="w-full h-48 p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 resize-none font-mono text-sm" placeholder={'{\n  "apiKey": "...",\n  "authDomain": "...",\n  "projectId": "..."\n}'} value={configInput} onChange={(e) => setConfigInput(e.target.value)} />
-              {setupError && <p className="text-red-500 mt-2 text-sm">{setupError}</p>}
-              <button onClick={handleSaveConfig} className="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-md">確認並啟動手帳</button>
-            </div>
-          </div>
-        );
-      }
-
-      // 如果尚未登入 (且載入完畢)，顯示專屬的登入畫面
-      if (user === null) {
+      if (needsConfig || user === null) {
         return (
           <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-blue-50 flex items-center justify-center p-4 font-sans">
-            <div className="bg-white/90 backdrop-blur-md p-10 rounded-3xl shadow-2xl max-w-md w-full border-4 border-yellow-400 text-center relative overflow-hidden">
-              <img src={POKE_IMAGES.eevee} className="absolute -bottom-6 -right-6 w-32 h-32 opacity-20 object-contain pointer-events-none" />
-              
-              <div className="flex justify-center mb-6 relative z-10">
-                <img src={POKE_IMAGES.pikachu} className="w-32 h-32 object-contain drop-shadow-lg transform hover:scale-110 transition-transform" />
-              </div>
-              
-              <h1 className="text-3xl font-extrabold text-gray-800 mb-2 relative z-10">竹北山下智久的手帳</h1>
-              <p className="text-gray-500 mb-8 font-medium relative z-10">登入專屬帳號，冒險紀錄永遠跟著你！</p>
-              
-              {systemMessage && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-xl text-sm font-bold relative z-10">
-                  {systemMessage}
-                </div>
-              )}
-
-              <button 
-                onClick={handleGoogleLogin} 
-                className="w-full bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-4 px-6 rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center gap-3 relative z-10"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
-                使用 Google 帳號登入
-              </button>
-            </div>
+             <div className="bg-white/90 backdrop-blur-md p-10 rounded-3xl shadow-2xl max-w-md w-full border-4 border-yellow-400 text-center relative overflow-hidden">
+               <img src={POKE_IMAGES.eevee} className="absolute -bottom-6 -right-6 w-32 h-32 opacity-20 object-contain pointer-events-none" />
+               <div className="flex justify-center mb-6 relative z-10"><img src={POKE_IMAGES.pikachu} className="w-32 h-32 object-contain drop-shadow-lg" /></div>
+               <h1 className="text-3xl font-extrabold text-gray-800 mb-2">竹北山下智久的手帳</h1>
+               <p className="text-gray-500 mb-8 font-medium">登入專屬帳號，冒險紀錄永遠跟著你！</p>
+               <button onClick={handleGoogleLogin} className="w-full bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-4 px-6 rounded-2xl shadow-sm flex items-center justify-center gap-3 relative z-10">
+                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> 使用 Google 帳號登入
+               </button>
+             </div>
           </div>
         );
       }
 
-      // 如果還在等待 Firebase 驗證狀態
       if (user === undefined) {
         return <div className="min-h-screen flex items-center justify-center bg-yellow-50 font-bold text-yellow-800 text-xl"><img src={POKE_IMAGES.pokeball} className="w-12 h-12 animate-spin mr-3 opacity-80" /> 讀取冒險資料中...</div>;
       }
 
-      // 已登入的主畫面
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-blue-50 p-4 md:p-8">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <header className="bg-white/80 backdrop-blur-md rounded-3xl shadow-lg border-b-4 border-yellow-400 p-6 flex flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <img src={POKE_IMAGES.pikachu} alt="Pikachu" className="w-16 h-16 object-contain transform hover:scale-110 transition-transform drop-shadow-md" />
-                <h1 className="text-2xl md:text-4xl font-extrabold text-gray-800 tracking-wide">竹北山下智久的手帳</h1>
-              </div>
-              <div className="flex items-center gap-4">
-                {/* 加上登出按鈕 */}
-                <button onClick={handleLogout} className="flex items-center justify-center p-2 md:px-4 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-500 rounded-xl transition-colors font-bold text-sm" title="登出">
-                  <LogOut className="w-5 h-5 md:mr-2" />
-                  <span className="hidden md:inline">登出</span>
-                </button>
-                <img src={POKE_IMAGES.pokeball} alt="Pokeball" className="w-10 h-10 object-contain opacity-80 animate-bounce hidden sm:block" style={{ animationDuration: '2s' }} />
-              </div>
-            </header>
+      // 數學計算日曆所需的空白格子 (解決五月、八月換行破圖的關鍵)
+      const startDay = new Date(calYear, calMonth, 1).getDay();
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      const totalCells = startDay + daysInMonth;
+      const trailingEmpty = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
 
-            <div className="flex flex-col lg:flex-row gap-8 justify-center">
-              <div className="w-full lg:w-[450px] xl:w-[520px] flex-shrink-0 lg:sticky lg:top-8 h-fit">
-                <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 shadow-xl border-4 border-yellow-400 relative overflow-hidden">
-                  <img src={MONTHLY_POKEMON[calMonth]} className="absolute -bottom-6 -right-6 w-40 h-40 opacity-15 object-contain pointer-events-none transition-all duration-500" />
+      return (
+        <div className="h-screen w-screen flex flex-col bg-[#f8fafc] overflow-hidden">
+          
+          {/* 頂部導覽列 */}
+          <header className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0 z-20">
+            <div className="flex items-center gap-3">
+              <img src={POKE_IMAGES.pikachu} className="w-10 h-10 md:w-12 md:h-12 object-contain" />
+              <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-wide">竹北山下智久的手帳</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="hidden md:block text-sm font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{user.email || '冒險者'}</span>
+              <button onClick={handleLogout} className="flex items-center p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="登出">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </header>
+
+          {/* 主要內容區 */}
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            
+            {/* 左側：全螢幕 Google 日曆風格 */}
+            <div className="flex-1 flex flex-col bg-white overflow-hidden relative border-r border-gray-200 shadow-sm z-10">
+              
+              {/* 絕對居中的浮水印寶可夢 */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                <img src={MONTHLY_POKEMON[calMonth]} className="w-[300px] h-[300px] md:w-[450px] md:h-[450px] opacity-15 object-contain transition-all duration-500 drop-shadow-sm" />
+              </div>
+
+              {/* 日曆控制列 */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-white/90 backdrop-blur-sm z-20 flex-shrink-0 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => { setCurrentDate(new Date().toISOString().split('T')[0]); setCalYear(new Date().getFullYear()); setCalMonth(new Date().getMonth()); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">今天</button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { let newM = calMonth - 1; let newY = calYear; if(newM < 0) { newM = 11; newY--; } setCalMonth(newM); setCalYear(newY); }} className="p-1.5 hover:bg-gray-100 rounded-full"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+                    <button onClick={() => { let newM = calMonth + 1; let newY = calYear; if(newM > 11) { newM = 0; newY++; } setCalMonth(newM); setCalYear(newY); }} className="p-1.5 hover:bg-gray-100 rounded-full"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-800 tracking-wide ml-2">{calYear}年 {calMonth + 1}月</h2>
+                </div>
+              </div>
+              
+              {/* 日曆網格主體 (統一邊框絕對對齊 + 自動補齊空白格) */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar bg-white/60 backdrop-blur-[1px] relative z-10">
+                <div className="min-w-[400px] lg:min-w-[500px] flex flex-col h-full calendar-wrapper">
                   
-                  <div className="flex justify-between items-center mb-6 relative z-10 bg-white/50 rounded-xl p-2">
-                    <button onClick={() => { let newM = calMonth - 1; let newY = calYear; if(newM < 0) { newM = 11; newY--; } setCalMonth(newM); setCalYear(newY); }} className="p-2 hover:bg-yellow-100 rounded-full transition-colors">
-                      <ChevronLeft className="w-6 h-6 text-gray-700" />
-                    </button>
-                    <h3 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-                      <Calendar className="text-yellow-500 w-5 h-5" /> {calYear}年 {calMonth + 1}月
-                    </h3>
-                    <button onClick={() => { let newM = calMonth + 1; let newY = calYear; if(newM > 11) { newM = 0; newY++; } setCalMonth(newM); setCalYear(newY); }} className="p-2 hover:bg-yellow-100 rounded-full transition-colors">
-                      <ChevronRight className="w-6 h-6 text-gray-700" />
-                    </button>
+                  {/* 星期標題區塊 - 使用 Sticky 固定，並確保被包在同樣的 wrapper 下以對齊格線 */}
+                  <div className="grid grid-cols-7 flex-shrink-0 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-sm border-b border-gray-200">
+                    {WEEKDAYS.map((day, idx) => (
+                      <div key={idx} className={`calendar-cell flex flex-col xl:flex-row items-center justify-center py-2 lg:py-3 gap-1 md:gap-2 ${day.color}`}>
+                        <span className="text-[10px] md:text-xs xl:text-sm font-black whitespace-nowrap">{day.tw}</span>
+                        <img src={day.poke} className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm flex-shrink-0" title={day.tw} />
+                      </div>
+                    ))}
                   </div>
                   
-                  <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 relative z-10">
-                    {['日', '一', '二', '三', '四', '五', '六'].map((day, i) => (
-                      <div key={day} className={`text-center font-bold text-sm py-2 ${i === 0 || i === 6 ? (i===0 ? 'text-red-500' : 'text-green-600') : 'text-gray-500'}`}>{day}</div>
-                    ))}
-                    {Array.from({ length: new Date(calYear, calMonth, 1).getDay() }).map((_, i) => <div key={`empty-${i}`} className="p-2"></div>)}
-                    {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, i) => {
+                  {/* 日期格子區塊 */}
+                  <div className="grid grid-cols-7 auto-rows-fr flex-1 min-h-[600px]">
+                    {/* 月初空白格 */}
+                    {Array.from({ length: startDay }).map((_, i) => <div key={`empty-${i}`} className="calendar-cell bg-gray-50/30"></div>)}
+                    
+                    {/* 當月日期 */}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
                       const day = i + 1;
                       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                       const isToday = dateStr === new Date().toISOString().split('T')[0];
@@ -414,199 +390,310 @@
                       const dayOfWeek = new Date(calYear, calMonth, day).getDay();
                       const lunarLabel = LUNAR_FIRST_MAP[dateStr] || (LUNAR_FIFTEENTH.includes(dateStr) ? '十五' : null);
                       
-                      let textColor = (dayOfWeek === 0 || holidayName) ? 'text-red-500 font-bold' : (dayOfWeek === 6 ? 'text-green-600 font-bold' : 'text-gray-700');
-                      const hasExpense = allExpenses.some(e => e.date === dateStr);
+                      let numColor = (dayOfWeek === 0 || holidayName) ? 'text-red-500' : (dayOfWeek === 6 ? 'text-gray-500' : 'text-gray-800');
+                      
+                      const dayExpenses = allExpenses.filter(e => e.date === dateStr);
                       const dayDiary = allDiaries.find(d => d.date === dateStr);
                       
-                      // 如果有日記，擷取前 4 個字當作摘要顯示
-                      const diaryAbstract = dayDiary ? (dayDiary.text.length > 4 ? dayDiary.text.substring(0, 4) + '..' : dayDiary.text) : '';
+                      // 篩選非例行性待辦：將日記拆分後，過濾掉含有 ROUTINE_TASKS 關鍵字的項目
+                      const allTasks = dayDiary && dayDiary.text ? dayDiary.text.split('\n').filter(t => t.trim() !== '') : [];
+                      const nonRoutineTasks = allTasks.filter(task => !ROUTINE_TASKS.some(routine => task.includes(routine)));
+
+                      // 決定背景顏色 (讓日期不會太素)
+                      let cellBg = 'bg-transparent';
+                      if (isSelected) {
+                        cellBg = 'bg-blue-100/70';
+                      } else if (isToday) {
+                        cellBg = 'bg-yellow-50/80';
+                      } else if (holidayName) {
+                        cellBg = 'bg-red-50/40';
+                      } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+                        cellBg = 'bg-slate-50/50';
+                      }
 
                       return (
-                        <button key={day} onClick={() => setCurrentDate(dateStr)} className={`relative p-1 md:py-3 rounded-2xl flex flex-col items-center justify-start transition-all min-h-[90px] md:min-h-[110px] ${isSelected ? 'bg-yellow-400 text-yellow-900 shadow-lg transform scale-110 font-bold z-20 ring-4 ring-yellow-300' : 'hover:bg-yellow-100'} ${isToday && !isSelected ? 'border-2 border-yellow-400 bg-yellow-50/50' : 'border border-transparent'}`}>
-                          <span className={`text-base md:text-lg ${isSelected ? 'text-yellow-900' : textColor}`}>{day}</span>
-                          <div className="flex-1 flex flex-col items-center justify-start mt-1 leading-tight w-full px-1 gap-0.5">
-                            {holidayName && <span className="text-[10px] md:text-xs text-red-500 font-bold whitespace-nowrap">{holidayName}</span>}
-                            {!holidayName && lunarLabel && <span className="text-[10px] md:text-xs text-gray-500 font-bold whitespace-nowrap">{lunarLabel}</span>}
-                            {/* 顯示行事曆(日記)摘要 */}
-                            {diaryAbstract && <span className="text-[10px] md:text-xs text-blue-700 font-bold mt-1 w-full truncate text-center block overflow-hidden bg-blue-50/80 rounded-md px-1 py-0.5 shadow-sm" title={dayDiary.text}>{diaryAbstract}</span>}
+                        <div key={day} onClick={() => { 
+                          setCurrentDate(dateStr); 
+                          // 【如果當天是空白的，點下去不彈窗，只會選取日期】
+                          if (dayExpenses.length > 0 || (dayDiary && dayDiary.text.trim() !== '')) {
+                            setShowDayModal(true); 
+                          }
+                        }} className={`calendar-cell relative p-1.5 flex flex-col cursor-pointer transition-colors hover:bg-blue-50/80 group min-h-[120px] ${cellBg} ${isSelected ? 'ring-2 ring-inset ring-blue-400 z-20' : 'z-10'}`}>
+                          
+                          {/* 頂部：節日與日期數字 */}
+                          <div className="flex justify-between items-start mb-1.5">
+                            <div className="flex flex-col items-start leading-none gap-1 mt-0.5">
+                              {holidayName && <span className="text-[10px] text-red-600 font-bold bg-white/90 px-1.5 py-0.5 rounded shadow-sm">{holidayName}</span>}
+                              {!holidayName && lunarLabel && <span className="text-[10px] text-gray-600 font-bold bg-white/80 px-1 rounded">{lunarLabel}</span>}
+                            </div>
+                            <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white shadow-md' : numColor}`}>{day}</span>
                           </div>
-                          <div className="flex gap-1.5 absolute bottom-1.5">
-                            {hasExpense && <div className="w-2 h-2 rounded-full bg-orange-500 shadow-sm"></div>}
-                            {dayDiary && <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm"></div>}
+                          
+                          {/* 內容區塊：只顯示非例行待辦，且記帳不顯示金額 */}
+                          <div className="flex-1 overflow-hidden flex flex-col gap-1.5">
+                            
+                            {/* 顯示前 4 個非例行待辦 */}
+                            {nonRoutineTasks.slice(0, 4).map((task, idx) => (
+                              <div key={`task-${idx}`} className="bg-blue-500 text-white text-[10px] md:text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate shadow-sm">
+                                {task}
+                              </div>
+                            ))}
+                            {nonRoutineTasks.length > 4 && <div className="text-[9px] text-blue-600 font-bold px-1 tracking-wider">...還有更多</div>}
+
+                            {/* 顯示記帳紀錄 (隱藏金額) */}
+                            {dayExpenses.map(e => (
+                              <div key={e.id} className={`text-[10px] md:text-[11px] font-bold px-1.5 py-0.5 rounded-md truncate shadow-sm bg-white/95 ${e.transactionMode === 'income' ? 'text-green-700' : 'text-red-600'}`}>
+                                {e.transactionMode === 'income' ? '💰 ' : ''}{e.type}
+                              </div>
+                            ))}
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
+                    
+                    {/* 月尾空白格 (這是五月、八月破圖的救星，自動補齊讓格子變完美矩形) */}
+                    {Array.from({ length: trailingEmpty }).map((_, i) => <div key={`trailing-${i}`} className="calendar-cell bg-gray-50/30"></div>)}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex-1 min-w-0 flex flex-col gap-4 lg:max-w-[500px] xl:max-w-[550px] w-full">
-                <div className="flex gap-2 md:gap-4 overflow-x-auto pb-1">
-                  <button onClick={() => setActiveTab('accounting')} className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 px-6 rounded-2xl font-bold text-lg transition-all shadow-sm ${activeTab === 'accounting' ? 'bg-yellow-400 text-yellow-900 border-2 border-yellow-500 shadow-md scale-105' : 'bg-white text-gray-500 hover:bg-yellow-50 border-2 border-transparent'}`}><Zap className="w-5 h-5" /> 記帳</button>
-                  <button onClick={() => setActiveTab('diary')} className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 px-6 rounded-2xl font-bold text-lg transition-all shadow-sm ${activeTab === 'diary' ? 'bg-blue-500 text-white border-2 border-blue-600 shadow-md scale-105' : 'bg-white text-gray-500 hover:bg-blue-50 border-2 border-transparent'}`}><Shield className="w-5 h-5" /> 日記</button>
-                  <button onClick={() => setActiveTab('stats')} className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 px-6 rounded-2xl font-bold text-lg transition-all shadow-sm ${activeTab === 'stats' ? 'bg-orange-500 text-white border-2 border-orange-600 shadow-md scale-105' : 'bg-white text-gray-500 hover:bg-orange-50 border-2 border-transparent'}`}><Flame className="w-5 h-5" /> 統計彙整</button>
-                </div>
+            {/* 右側：精簡版側邊工具欄 */}
+            <div className="w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 flex flex-col bg-[#f8fafc] z-20 border-l border-gray-200 shadow-xl">
+              
+              <div className="flex bg-gray-200 p-1.5 mx-4 mt-4 rounded-xl flex-shrink-0">
+                <button onClick={() => setActiveTab('accounting')} className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'accounting' ? 'bg-white shadow text-yellow-600' : 'text-gray-500 hover:text-gray-700'}`}><Zap className="w-4 h-4" /> 記帳</button>
+                <button onClick={() => setActiveTab('diary')} className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'diary' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}><Shield className="w-4 h-4" /> 日記</button>
+                <button onClick={() => setActiveTab('stats')} className={`flex-1 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === 'stats' ? 'bg-white shadow text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}><Flame className="w-4 h-4" /> 統計</button>
+              </div>
 
-                <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-xl border border-gray-100 p-5 md:p-6 min-h-[400px]">
-                  
-                  {activeTab === 'accounting' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b-2 border-yellow-200 pb-2 gap-2">
-                          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3"><img src={POKE_IMAGES.meowth} className="w-10 h-10 object-contain drop-shadow-md" /> 新增紀錄</h2>
-                          <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
-                            <button type="button" onClick={() => {setTransactionMode('expense'); setType('午餐');}} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-bold transition-all ${transactionMode === 'expense' ? 'bg-white shadow-sm text-red-500' : 'text-gray-500 hover:text-gray-700'}`}>支出</button>
-                            <button type="button" onClick={() => {setTransactionMode('income'); setType('薪水');}} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-bold transition-all ${transactionMode === 'income' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}>收入</button>
-                          </div>
-                        </div>
-                        <form onSubmit={handleAddExpense} className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-600 mb-1">種類</label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {(transactionMode === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
-                                <button key={cat.name} type="button" onClick={() => setType(cat.name)} className={`p-2 rounded-xl text-sm flex flex-col items-center justify-center gap-1 transition-all ${type === cat.name ? 'ring-2 ring-yellow-400 bg-yellow-50 scale-105 shadow-sm font-bold' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                                  <img src={cat.icon} className="w-10 h-10 object-contain drop-shadow-sm mb-1" />
-                                  <span className="text-gray-700">{cat.name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-600 mb-1">金額</label>
-                            <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                              <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-yellow-400 focus:bg-white transition-colors text-lg font-bold" placeholder="0" />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-600 mb-1">備註 (選填)</label>
-                            <input type="text" value={note} onChange={(e) => setNote(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-yellow-400 focus:bg-white transition-colors" placeholder="買了什麼好東西？" />
-                          </div>
-                          {systemMessage && (
-                            <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-xl font-bold text-sm shadow-sm flex items-center gap-2">
-                              <span>⚠️</span> {systemMessage}
-                            </div>
-                          )}
-                          <button type="submit" className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"><Save className="w-5 h-5" /> 記錄到背包</button>
-                        </form>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-end border-b-2 border-gray-100 pb-2">
-                          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><BookOpen className="text-blue-500" /> 今日明細</h2>
-                          <div className="text-base font-bold text-gray-600">
-                            總計: <span className={`text-xl ml-1 ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                              ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="space-y-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-                          {todaysExpenses.length === 0 ? (
-                            <div className="text-center py-6 text-gray-500 flex flex-col items-center font-bold text-sm">
-                              <img src={POKE_IMAGES.snorlax} className="w-24 h-24 object-contain drop-shadow-xl mb-3 transform hover:scale-105 transition-transform" />
-                              卡比獸擋住了道路...今天還沒有紀錄喔！
-                            </div>
-                          ) : (
-                            todaysExpenses.map(expense => {
-                              const isIncome = expense.transactionMode === 'income';
-                              const catInfo = (isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).find(c => c.name === expense.type) || EXPENSE_CATEGORIES[8];
-                              return (
-                                <div key={expense.id} className={`flex items-center justify-between p-4 bg-white border-2 ${isIncome ? 'border-green-50' : 'border-gray-50'} rounded-2xl shadow-sm hover:border-blue-200 transition-colors group`}>
-                                  <div className="flex items-center gap-4">
-                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center ${catInfo.color}`}><img src={catInfo.icon} className="w-10 h-10 object-contain drop-shadow-sm" /></div>
-                                    <div>
-                                      <div className="font-bold text-gray-800 text-lg flex items-center gap-2">
-                                        {isIncome && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">收入</span>}
-                                        {expense.type}
-                                      </div>
-                                      {expense.note && <div className="text-sm text-gray-500">{expense.note}</div>}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <span className={`font-extrabold text-xl ${isIncome ? 'text-green-600' : 'text-gray-700'}`}>
-                                      {isIncome ? '+' : '-'}${expense.amount}
-                                    </span>
-                                    <button onClick={() => handleDeleteExpense(expense.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="w-5 h-5" /></button>
-                                  </div>
-                                </div>
-                              )
-                            })
-                          )}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col">
+                
+                {/* 記帳 */}
+                {activeTab === 'accounting' && (
+                  <div className="flex flex-col gap-6 h-full">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex-shrink-0">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><img src={POKE_IMAGES.meowth} className="w-6 h-6 object-contain" /> {currentDate}</h2>
+                        <div className="flex bg-gray-100 rounded-md p-0.5">
+                          <button onClick={() => {setTransactionMode('expense'); setType('午餐');}} className={`px-3 py-1 rounded text-xs font-bold transition-all ${transactionMode === 'expense' ? 'bg-white shadow-sm text-red-500' : 'text-gray-500'}`}>支出</button>
+                          <button onClick={() => {setTransactionMode('income'); setType('薪水');}} className={`px-3 py-1 rounded text-xs font-bold transition-all ${transactionMode === 'income' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500'}`}>收入</button>
                         </div>
                       </div>
-                    </div>
-                  )}
-
-                  {activeTab === 'diary' && (
-                    <div className="h-full flex flex-col">
-                      <h2 className="text-xl font-bold text-blue-800 flex items-center gap-3 mb-4 border-b-2 border-blue-200 pb-2"><img src={POKE_IMAGES.lucario} className="w-12 h-12 object-contain drop-shadow-md" /> 冒險日誌 ({currentDate})</h2>
                       
-                      {/* 快捷例行工作按鈕 */}
-                      <div className="mb-4 flex flex-wrap gap-2">
-                        {ROUTINE_TASKS.map(task => (
-                          <button key={task} onClick={() => setDiaryText(prev => prev + (prev ? '\n' : '') + task)} className="px-3 py-1.5 bg-white text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all border-2 border-blue-100 hover:border-blue-300 shadow-sm flex items-center gap-1 active:scale-95">
-                            {task}
-                          </button>
-                        ))}
-                      </div>
-
-                      <textarea value={diaryText} onChange={(e) => setDiaryText(e.target.value)} placeholder="跟路卡利歐分享今天遇到了什麼寶可夢？發生了什麼有趣的事呢？" className="flex-1 w-full min-h-[180px] p-5 bg-blue-50/50 border-2 border-blue-100 rounded-2xl focus:border-blue-400 focus:bg-white transition-colors text-base md:text-lg leading-relaxed resize-none text-gray-700" />
-                      <div className="mt-4 flex justify-end">
-                        <button onClick={handleSaveDiary} disabled={isSavingDiary} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70">
-                          {isSavingDiary ? '波導傳輸中...' : <><Save className="w-5 h-5" /> 儲存日誌</>}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === 'stats' && (
-                    <div>
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-2 border-orange-200 pb-2 mb-6 gap-4">
-                        <h2 className="text-xl font-bold text-orange-800 flex items-center gap-3"><img src={POKE_IMAGES.charizard} className="w-14 h-14 object-contain drop-shadow-md" /> {currentDate.substring(0, 4)}年 {currentDate.substring(5, 7)}月 彙整</h2>
-                        <div className="flex gap-4 items-end w-full md:w-auto flex-col sm:flex-row">
-                          <div className="text-sm font-bold text-gray-600 flex flex-col sm:flex-row gap-2 sm:gap-4 items-end sm:items-center bg-gray-50 p-2 rounded-xl border-2 border-gray-100 w-full sm:w-auto">
-                            <span className="flex items-center gap-1">總收入: <span className="text-green-600">${currentMonthStats.totalIncome}</span></span>
-                            <span className="flex items-center gap-1">總支出: <span className="text-red-500">${currentMonthStats.totalExpense}</span></span>
-                            <span className="text-base sm:border-l-2 sm:border-gray-200 sm:pl-4">結餘: <span className={currentMonthStats.net >= 0 ? 'text-green-600' : 'text-red-500'}>${currentMonthStats.net}</span></span>
+                      <form onSubmit={handleAddExpense} className="space-y-4">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {(transactionMode === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
+                            <button key={cat.name} type="button" onClick={() => setType(cat.name)} className={`py-1.5 rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all border ${type === cat.name ? 'bg-yellow-50 border-yellow-400 ring-1 ring-yellow-400 font-bold' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`}>
+                              <img src={cat.icon} className="w-6 h-6 object-contain" />
+                              <span className="text-[10px] text-gray-700">{cat.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                            <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-7 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-yellow-400 focus:bg-white transition-colors font-bold shadow-inner text-sm" placeholder="金額" />
                           </div>
-                          
-                          {/* 匯出 CSV 按鈕 */}
-                          <button onClick={handleExportCSV} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm whitespace-nowrap">
-                            <FileSpreadsheet className="w-5 h-5" /> 匯出為試算表 (CSV)
-                          </button>
+                          <input type="text" value={note} onChange={(e) => setNote(e.target.value)} className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-yellow-400 focus:bg-white transition-colors shadow-inner text-sm" placeholder="備註..." />
+                        </div>
+                        <button type="submit" className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-2.5 rounded-xl shadow-sm active:scale-95 flex items-center justify-center gap-1 text-sm"><Save className="w-4 h-4" /> 記錄</button>
+                      </form>
+                    </div>
+
+                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col min-h-0">
+                      <div className="flex justify-between items-center mb-3 flex-shrink-0">
+                        <h3 className="text-sm font-bold text-gray-500">今日明細</h3>
+                        <div className={`text-base font-black ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0)}
                         </div>
                       </div>
-                      {currentMonthStats.totalExpense === 0 && currentMonthStats.totalIncome === 0 ? (
-                        <div className="text-center py-20 text-gray-500 flex flex-col items-center font-bold">
-                          <img src={POKE_IMAGES.slowpoke} className="w-40 h-40 object-contain drop-shadow-xl mb-4 transform hover:scale-105 transition-transform" />
-                          呆呆獸發呆中...這個月還沒有冒險紀錄喔！
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          {Object.entries(currentMonthStats.stats).sort(([, a], [, b]) => b - a).map(([type, amount]) => {
-                            const catInfo = EXPENSE_CATEGORIES.find(c => c.name === type) || EXPENSE_CATEGORIES[8];
-                            const percentage = ((amount / currentMonthStats.total) * 100).toFixed(1);
+                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                        {todaysExpenses.length === 0 ? (
+                          <div className="text-center py-8 text-gray-400 text-xs font-bold flex flex-col items-center">
+                            <img src={POKE_IMAGES.snorlax} className="w-16 h-16 opacity-60 mb-2" /> 尚未有紀錄
+                          </div>
+                        ) : (
+                          todaysExpenses.map(e => {
+                            const isIncome = e.transactionMode === 'income';
+                            const catInfo = (isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).find(c => c.name === e.type) || EXPENSE_CATEGORIES[8];
                             return (
-                              <div key={type} className="relative">
-                                <div className="flex justify-between text-sm font-bold text-gray-700 mb-2">
-                                  <span className="flex items-center gap-2"><img src={catInfo.icon} className="w-8 h-8 object-contain" /> {type}</span>
-                                  <span className="flex items-center">${amount} ({percentage}%)</span>
+                              <div key={e.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-xl group border border-transparent hover:border-gray-200">
+                                <div className="flex items-center gap-2 truncate">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${catInfo.color}`}><img src={catInfo.icon} className="w-5 h-5" /></div>
+                                  <div className="truncate">
+                                    <div className="text-sm font-bold text-gray-700 leading-tight">{e.type}</div>
+                                    {e.note && <div className="text-[10px] text-gray-500 truncate">{e.note}</div>}
+                                  </div>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-                                  <div className={`h-4 rounded-full ${catInfo.color.split(' ')[0]} bg-opacity-80`} style={{ width: `${percentage}%` }}></div>
+                                <div className="flex items-center gap-2 pl-2 flex-shrink-0">
+                                  <span className={`font-black text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>{isIncome ? '+' : '-'}${e.amount}</span>
+                                  <button onClick={() => handleDeleteExpense(e.id)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 日記 */}
+                {activeTab === 'diary' && (
+                  <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <h2 className="text-lg font-bold text-blue-800 flex items-center gap-2 mb-3"><img src={POKE_IMAGES.lucario} className="w-6 h-6 object-contain" /> {currentDate} 待辦/日記</h2>
+                    <div className="flex flex-wrap gap-1.5 mb-3 flex-shrink-0">
+                      {ROUTINE_TASKS.map(task => (
+                        <button key={task} onClick={() => setDiaryText(prev => prev + (prev ? '\n' : '') + task)} className="px-2.5 py-1 bg-gray-50 text-blue-700 text-xs font-bold rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-sm active:scale-95">
+                          {task}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea value={diaryText} onChange={(e) => setDiaryText(e.target.value)} placeholder="每換一行，就會在日曆上產生一個新的待辦任務方塊喔！" className="flex-1 w-full p-3 bg-blue-50/30 border border-blue-100 rounded-xl focus:border-blue-400 focus:ring-0 resize-none text-sm text-gray-700 leading-relaxed custom-scrollbar" />
+                    <button onClick={handleSaveDiary} disabled={isSavingDiary} className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow-md active:scale-95 flex justify-center gap-1.5 text-sm">
+                      {isSavingDiary ? '儲存中...' : <><CheckCircle2 className="w-4 h-4" /> 完成</>}
+                    </button>
+                  </div>
+                )}
+
+                {/* 統計 */}
+                {activeTab === 'stats' && (
+                  <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4 flex-shrink-0">
+                      <h2 className="text-lg font-bold text-orange-800 flex items-center gap-2"><img src={POKE_IMAGES.charizard} className="w-6 h-6 object-contain" /> 本月彙整</h2>
+                      <button onClick={handleExportCSV} className="bg-green-500 hover:bg-green-600 text-white font-bold p-1.5 rounded-lg transition-all shadow-sm active:scale-95" title="匯出 CSV">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 mb-5 flex-shrink-0">
+                      <div className="bg-gray-50 p-2 rounded-xl text-center border border-gray-100">
+                        <div className="text-[10px] text-gray-500 font-bold">總收入</div>
+                        <div className="text-sm font-black text-green-600">${currentMonthStats.totalIncome}</div>
+                      </div>
+                      <div className="bg-gray-50 p-2 rounded-xl text-center border border-gray-100">
+                        <div className="text-[10px] text-gray-500 font-bold">總支出</div>
+                        <div className="text-sm font-black text-red-500">${currentMonthStats.totalExpense}</div>
+                      </div>
+                      <div className={`p-2 rounded-xl text-center border ${currentMonthStats.net >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                        <div className={`text-[10px] font-bold ${currentMonthStats.net >= 0 ? 'text-green-700' : 'text-red-700'}`}>結餘</div>
+                        <div className={`text-sm font-black ${currentMonthStats.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>${currentMonthStats.net}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                      {currentMonthStats.totalExpense === 0 && currentMonthStats.totalIncome === 0 ? (
+                        <div className="text-center py-10 text-gray-400 text-xs font-bold"><img src={POKE_IMAGES.slowpoke} className="w-16 h-16 mx-auto opacity-50 mb-2" />無紀錄</div>
+                      ) : (
+                        Object.entries(currentMonthStats.stats).sort(([, a], [, b]) => b - a).map(([type, amount]) => {
+                          const catInfo = INCOME_CATEGORIES.find(c => c.name === type) || EXPENSE_CATEGORIES.find(c => c.name === type) || EXPENSE_CATEGORIES[8];
+                          const percentage = ((amount / (currentMonthStats.totalExpense + currentMonthStats.totalIncome)) * 100).toFixed(1);
+                          return (
+                            <div key={type} className="relative">
+                              <div className="flex justify-between items-center text-xs font-bold text-gray-700 mb-1">
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <img src={catInfo.icon} className="w-5 h-5 object-contain" /> <span className="truncate">{type}</span>
+                                </span>
+                                <span className="text-gray-600">${amount} <span className="text-gray-400 text-[10px]">({percentage}%)</span></span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                                <div className={`h-full rounded-full ${catInfo.color.split(' ')[0]} bg-opacity-80`} style={{ width: `${percentage}%` }}></div>
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {/* === 日曆專屬：每日詳細資訊彈出視窗 === */}
+          {showDayModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowDayModal(false)}>
+              <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border-4 border-yellow-400 relative flex flex-col max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                
+                <div className="bg-yellow-50 px-6 py-4 border-b border-yellow-200 flex justify-between items-center flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <img src={POKE_IMAGES.pikachu} className="w-8 h-8 object-contain" />
+                    <div>
+                      <h2 className="text-xl font-black text-gray-800">{currentDate}</h2>
+                      {(TAIWAN_HOLIDAYS_MAP[currentDate] || LUNAR_FIRST_MAP[currentDate] || (LUNAR_FIFTEENTH.includes(currentDate) ? '十五' : null)) && (
+                        <div className="text-xs font-bold text-red-500 mt-0.5">
+                          {TAIWAN_HOLIDAYS_MAP[currentDate]} {LUNAR_FIRST_MAP[currentDate] || (LUNAR_FIFTEENTH.includes(currentDate) ? '十五' : null)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => setShowDayModal(false)} className="p-2 bg-white rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shadow-sm">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6 relative">
+                  <img src={POKE_IMAGES.eevee} className="absolute -bottom-4 -right-4 w-32 h-32 opacity-10 object-contain pointer-events-none" />
+                  
+                  <section>
+                    <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2 mb-3 border-b-2 border-blue-100 pb-1">
+                      <Shield className="w-5 h-5" /> 冒險日誌 & 待辦
+                    </h3>
+                    {diaryText ? (
+                      <div className="space-y-2 relative z-10">
+                        {diaryText.split('\n').filter(t => t.trim() !== '').map((task, idx) => (
+                          <div key={idx} className="bg-blue-50 text-blue-800 px-3 py-2 rounded-xl text-sm font-bold shadow-sm border border-blue-100 flex items-start gap-2">
+                            <span className="mt-0.5">•</span> <span>{task}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400 font-bold italic relative z-10">這天沒有留下任何日記或待辦事項。</div>
+                    )}
+                  </section>
+
+                  <section>
+                    <div className="flex justify-between items-end border-b-2 border-orange-100 pb-1 mb-3">
+                      <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                        <Zap className="w-5 h-5" /> 收支明細
+                      </h3>
+                      <div className={`font-black ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        總計: ${todaysExpenses.reduce((sum, e) => sum + (e.transactionMode==='income'?e.amount:-e.amount), 0)}
+                      </div>
+                    </div>
+                    {todaysExpenses.length > 0 ? (
+                      <div className="space-y-2 relative z-10">
+                        {todaysExpenses.map(e => {
+                          const isIncome = e.transactionMode === 'income';
+                          const catInfo = (isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).find(c => c.name === e.type) || EXPENSE_CATEGORIES[8];
+                          return (
+                            <div key={e.id} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${catInfo.color}`}><img src={catInfo.icon} className="w-5 h-5" /></div>
+                                <div>
+                                  <div className="text-sm font-bold text-gray-700 leading-tight">{e.type}</div>
+                                  {e.note && <div className="text-xs text-gray-500">{e.note}</div>}
+                                </div>
+                              </div>
+                              <span className={`font-black text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>{isIncome ? '+' : '-'}${e.amount}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400 font-bold italic relative z-10">這天沒有任何花費或收入紀錄。</div>
+                    )}
+                  </section>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3 flex-shrink-0 z-10">
+                  <button onClick={() => { setShowDayModal(false); setActiveTab('diary'); }} className="flex-1 py-2.5 bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold rounded-xl transition-colors text-sm shadow-sm">寫日記</button>
+                  <button onClick={() => { setShowDayModal(false); setActiveTab('accounting'); }} className="flex-1 py-2.5 bg-yellow-400 text-yellow-900 hover:bg-yellow-500 font-bold rounded-xl transition-colors text-sm shadow-sm">去記帳</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
