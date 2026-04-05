@@ -46,7 +46,7 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { Calendar, BookOpen, Plus, ChevronLeft, ChevronRight, Save, Trash2, Cloud, Flame, Zap, Shield, LogOut, FileSpreadsheet, CheckCircle2, X } from 'https://esm.sh/lucide-react@0.300.0';
+    import { Calendar, BookOpen, ChevronLeft, ChevronRight, Save, Trash2, Flame, Zap, Shield, LogOut, FileSpreadsheet, CheckCircle2, X } from 'https://esm.sh/lucide-react@0.300.0';
     
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
@@ -319,7 +319,8 @@
       const startDay = new Date(calYear, calMonth, 1).getDay();
       const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
       const totalCells = startDay + daysInMonth;
-      const trailingEmpty = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+      const numWeeks = Math.ceil(totalCells / 7);
+      const trailingEmpty = (numWeeks * 7) - totalCells;
 
       return (
         <div className="h-screen w-screen flex flex-col bg-[#f8fafc] overflow-hidden">
@@ -346,7 +347,7 @@
               
               {/* 絕對居中的浮水印寶可夢 */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                <img src={MONTHLY_POKEMON[calMonth]} className="w-[300px] h-[300px] md:w-[450px] md:h-[450px] opacity-15 object-contain transition-all duration-500 drop-shadow-sm" />
+                <img src={MONTHLY_POKEMON[calMonth]} className="w-64 h-64 md:w-[400px] md:h-[400px] opacity-15 object-contain transition-all duration-500 drop-shadow-sm" />
               </div>
 
               {/* 日曆控制列 */}
@@ -363,97 +364,88 @@
               
               {/* 日曆網格主體 (統一邊框絕對對齊 + 自動補齊空白格) */}
               <div className="flex-1 overflow-y-auto custom-scrollbar bg-white/60 backdrop-blur-[1px] relative z-10">
-                <div className="min-w-[400px] lg:min-w-[500px] flex flex-col h-full calendar-wrapper">
+                <div 
+                  className="calendar-wrapper grid grid-cols-7 min-w-[500px] h-full"
+                  style={{ gridTemplateRows: "max-content repeat(" + numWeeks + ", minmax(110px, 1fr))" }}
+                >
                   
                   {/* 星期標題區塊 - 使用 Sticky 固定，並確保被包在同樣的 wrapper 下以對齊格線 */}
-                  <div className="grid grid-cols-7 flex-shrink-0 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-sm border-b border-gray-200">
-                    {WEEKDAYS.map((day, idx) => (
-                      <div key={idx} className={`calendar-cell flex flex-col xl:flex-row items-center justify-center py-2 lg:py-3 gap-1 md:gap-2 ${day.color}`}>
-                        <span className="text-[10px] md:text-xs xl:text-sm font-black whitespace-nowrap">{day.tw}</span>
-                        <img src={day.poke} className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm flex-shrink-0" title={day.tw} />
-                      </div>
-                    ))}
-                  </div>
+                  {WEEKDAYS.map((day, idx) => (
+                    <div key={`header-${idx}`} className={`calendar-cell sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-gray-200 py-3 flex flex-col xl:flex-row items-center justify-center gap-1 md:gap-2 shadow-sm ${day.color}`}>
+                      <span className="text-xs md:text-sm font-black whitespace-nowrap">{day.tw}</span>
+                      <img src={day.poke} className="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-sm flex-shrink-0" title={day.tw} />
+                    </div>
+                  ))}
                   
-                  {/* 日期格子區塊 */}
-                  <div className="grid grid-cols-7 auto-rows-fr flex-1 min-h-[600px]">
-                    {/* 月初空白格 */}
-                    {Array.from({ length: startDay }).map((_, i) => <div key={`empty-${i}`} className="calendar-cell bg-gray-50/30"></div>)}
+                  {/* 月初空白格 */}
+                  {Array.from({ length: startDay }).map((_, i) => <div key={`empty-${i}`} className="calendar-cell bg-gray-50/40"></div>)}
+                  
+                  {/* 當月日期格子 */}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
+                    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isToday = dateStr === new Date().toISOString().split('T')[0];
+                    const isSelected = dateStr === currentDate;
+                    const holidayName = TAIWAN_HOLIDAYS_MAP[dateStr];
+                    const dayOfWeek = new Date(calYear, calMonth, day).getDay();
+                    const lunarLabel = LUNAR_FIRST_MAP[dateStr] || (LUNAR_FIFTEENTH.includes(dateStr) ? '十五' : null);
                     
-                    {/* 當月日期 */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                      const day = i + 1;
-                      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                      const isToday = dateStr === new Date().toISOString().split('T')[0];
-                      const isSelected = dateStr === currentDate;
-                      const holidayName = TAIWAN_HOLIDAYS_MAP[dateStr];
-                      const dayOfWeek = new Date(calYear, calMonth, day).getDay();
-                      const lunarLabel = LUNAR_FIRST_MAP[dateStr] || (LUNAR_FIFTEENTH.includes(dateStr) ? '十五' : null);
-                      
-                      let numColor = (dayOfWeek === 0 || holidayName) ? 'text-red-500' : (dayOfWeek === 6 ? 'text-gray-500' : 'text-gray-800');
-                      
-                      const dayExpenses = allExpenses.filter(e => e.date === dateStr);
-                      const dayDiary = allDiaries.find(d => d.date === dateStr);
-                      
-                      // 篩選非例行性待辦：將日記拆分後，過濾掉含有 ROUTINE_TASKS 關鍵字的項目
-                      const allTasks = dayDiary && dayDiary.text ? dayDiary.text.split('\n').filter(t => t.trim() !== '') : [];
-                      const nonRoutineTasks = allTasks.filter(task => !ROUTINE_TASKS.some(routine => task.includes(routine)));
+                    let numColor = (dayOfWeek === 0 || holidayName) ? 'text-red-500' : (dayOfWeek === 6 ? 'text-gray-500' : 'text-gray-800');
+                    
+                    const dayExpenses = allExpenses.filter(e => e.date === dateStr);
+                    const dayDiary = allDiaries.find(d => d.date === dateStr);
+                    
+                    // 篩選非例行性待辦：將日記拆分後，過濾掉含有 ROUTINE_TASKS 關鍵字的項目
+                    const allTasks = dayDiary && dayDiary.text ? dayDiary.text.split('\n').filter(t => t.trim() !== '') : [];
+                    const nonRoutineTasks = allTasks.filter(task => !ROUTINE_TASKS.some(routine => task.includes(routine)));
 
-                      // 決定背景顏色 (讓日期不會太素)
-                      let cellBg = 'bg-transparent';
-                      if (isSelected) {
-                        cellBg = 'bg-blue-100/70';
-                      } else if (isToday) {
-                        cellBg = 'bg-yellow-50/80';
-                      } else if (holidayName) {
-                        cellBg = 'bg-red-50/40';
-                      } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-                        cellBg = 'bg-slate-50/50';
-                      }
+                    // 決定背景顏色 (讓日期不會太素)
+                    let cellBg = 'bg-transparent';
+                    if (isSelected) {
+                      cellBg = 'bg-blue-100/70';
+                    } else if (isToday) {
+                      cellBg = 'bg-yellow-50/80';
+                    } else if (holidayName) {
+                      cellBg = 'bg-red-50/40';
+                    } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+                      cellBg = 'bg-slate-50/50';
+                    }
 
-                      return (
-                        <div key={day} onClick={() => { 
-                          setCurrentDate(dateStr); 
-                          // 【如果當天是空白的，點下去不彈窗，只會選取日期】
-                          if (dayExpenses.length > 0 || (dayDiary && dayDiary.text.trim() !== '')) {
-                            setShowDayModal(true); 
-                          }
-                        }} className={`calendar-cell relative p-1.5 flex flex-col cursor-pointer transition-colors hover:bg-blue-50/80 group min-h-[120px] ${cellBg} ${isSelected ? 'ring-2 ring-inset ring-blue-400 z-20' : 'z-10'}`}>
-                          
-                          {/* 頂部：節日與日期數字 */}
-                          <div className="flex justify-between items-start mb-1.5">
-                            <div className="flex flex-col items-start leading-none gap-1 mt-0.5">
-                              {holidayName && <span className="text-[10px] text-red-600 font-bold bg-white/90 px-1.5 py-0.5 rounded shadow-sm">{holidayName}</span>}
-                              {!holidayName && lunarLabel && <span className="text-[10px] text-gray-600 font-bold bg-white/80 px-1 rounded">{lunarLabel}</span>}
-                            </div>
-                            <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white shadow-md' : numColor}`}>{day}</span>
+                    return (
+                      <div key={day} onClick={() => { 
+                        setCurrentDate(dateStr); 
+                        // 【防呆機制：如果當天是空白的，點下去不彈窗，只會選取日期】
+                        if (dayExpenses.length > 0 || (dayDiary && dayDiary.text.trim() !== '')) {
+                          setShowDayModal(true); 
+                        }
+                      }} className={`calendar-cell relative p-1.5 flex flex-col cursor-pointer transition-colors hover:bg-blue-50/80 group min-w-0 ${cellBg} ${isSelected ? 'ring-2 ring-inset ring-blue-400 z-20' : 'z-10'}`}>
+                        
+                        {/* 頂部：節日與日期數字 */}
+                        <div className="flex justify-between items-start mb-1.5 flex-shrink-0">
+                          <div className="flex flex-col items-start leading-none gap-1 mt-0.5 min-w-0 pr-1">
+                            {holidayName && <span className="text-[10px] text-red-600 font-bold bg-white/90 px-1.5 py-0.5 rounded shadow-sm truncate w-full">{holidayName}</span>}
+                            {!holidayName && lunarLabel && <span className="text-[10px] text-gray-500 font-bold bg-white/50 px-1 rounded truncate w-full">{lunarLabel}</span>}
                           </div>
-                          
-                          {/* 內容區塊：只顯示非例行待辦，且記帳不顯示金額 */}
-                          <div className="flex-1 overflow-hidden flex flex-col gap-1.5">
-                            
-                            {/* 顯示前 4 個非例行待辦 */}
-                            {nonRoutineTasks.slice(0, 4).map((task, idx) => (
-                              <div key={`task-${idx}`} className="bg-blue-500 text-white text-[10px] md:text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate shadow-sm">
-                                {task}
-                              </div>
-                            ))}
-                            {nonRoutineTasks.length > 4 && <div className="text-[9px] text-blue-600 font-bold px-1 tracking-wider">...還有更多</div>}
-
-                            {/* 顯示記帳紀錄 (隱藏金額) */}
-                            {dayExpenses.map(e => (
-                              <div key={e.id} className={`text-[10px] md:text-[11px] font-bold px-1.5 py-0.5 rounded-md truncate shadow-sm bg-white/95 ${e.transactionMode === 'income' ? 'text-green-700' : 'text-red-600'}`}>
-                                {e.transactionMode === 'income' ? '💰 ' : ''}{e.type}
-                              </div>
-                            ))}
-                          </div>
+                          <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white shadow-md' : numColor}`}>{day}</span>
                         </div>
-                      );
-                    })}
-                    
-                    {/* 月尾空白格 (這是五月、八月破圖的救星，自動補齊讓格子變完美矩形) */}
-                    {Array.from({ length: trailingEmpty }).map((_, i) => <div key={`trailing-${i}`} className="calendar-cell bg-gray-50/30"></div>)}
-                  </div>
+                        
+                        {/* 內容區塊：只顯示非例行待辦 (記帳已被完全隱藏) */}
+                        <div className="flex-1 overflow-hidden flex flex-col gap-1.5 min-w-0 w-full">
+                          
+                          {/* 顯示前 4 個非例行待辦 */}
+                          {nonRoutineTasks.slice(0, 4).map((task, idx) => (
+                            <div key={`task-${idx}`} className="bg-blue-500 text-white text-[10px] md:text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate shadow-sm w-full">
+                              {task}
+                            </div>
+                          ))}
+                          {nonRoutineTasks.length > 4 && <div className="text-[9px] text-blue-600 font-bold px-1 tracking-wider flex-shrink-0">...還有更多</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* 月尾空白格 (這是五月、八月破圖的救星，自動補齊讓格子變完美矩形) */}
+                  {Array.from({ length: trailingEmpty }).map((_, i) => <div key={`trailing-${i}`} className="calendar-cell bg-gray-50/40"></div>)}
                 </div>
               </div>
             </div>
@@ -518,12 +510,12 @@
                             const isIncome = e.transactionMode === 'income';
                             const catInfo = (isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).find(c => c.name === e.type) || EXPENSE_CATEGORIES[8];
                             return (
-                              <div key={e.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-xl group border border-transparent hover:border-gray-200">
-                                <div className="flex items-center gap-2 truncate">
+                              <div key={e.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-xl group border border-transparent hover:border-gray-200 min-w-0">
+                                <div className="flex items-center gap-2 truncate min-w-0">
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${catInfo.color}`}><img src={catInfo.icon} className="w-5 h-5" /></div>
-                                  <div className="truncate">
+                                  <div className="truncate min-w-0">
                                     <div className="text-sm font-bold text-gray-700 leading-tight">{e.type}</div>
-                                    {e.note && <div className="text-[10px] text-gray-500 truncate">{e.note}</div>}
+                                    {e.note && <div className="text-[10px] text-gray-500 truncate min-w-0">{e.note}</div>}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 pl-2 flex-shrink-0">
@@ -592,10 +584,10 @@
                           return (
                             <div key={type} className="relative">
                               <div className="flex justify-between items-center text-xs font-bold text-gray-700 mb-1">
-                                <span className="flex items-center gap-1.5 truncate">
-                                  <img src={catInfo.icon} className="w-5 h-5 object-contain" /> <span className="truncate">{type}</span>
+                                <span className="flex items-center gap-1.5 truncate min-w-0">
+                                  <img src={catInfo.icon} className="w-5 h-5 object-contain flex-shrink-0" /> <span className="truncate">{type}</span>
                                 </span>
-                                <span className="text-gray-600">${amount} <span className="text-gray-400 text-[10px]">({percentage}%)</span></span>
+                                <span className="text-gray-600 flex-shrink-0">${amount} <span className="text-gray-400 text-[10px]">({percentage}%)</span></span>
                               </div>
                               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
                                 <div className={`h-full rounded-full ${catInfo.color.split(' ')[0]} bg-opacity-80`} style={{ width: `${percentage}%` }}></div>
@@ -643,8 +635,8 @@
                     {diaryText ? (
                       <div className="space-y-2 relative z-10">
                         {diaryText.split('\n').filter(t => t.trim() !== '').map((task, idx) => (
-                          <div key={idx} className="bg-blue-50 text-blue-800 px-3 py-2 rounded-xl text-sm font-bold shadow-sm border border-blue-100 flex items-start gap-2">
-                            <span className="mt-0.5">•</span> <span>{task}</span>
+                          <div key={idx} className="bg-blue-50 text-blue-800 px-3 py-2 rounded-xl text-sm font-bold shadow-sm border border-blue-100 flex items-start gap-2 min-w-0">
+                            <span className="mt-0.5 flex-shrink-0">•</span> <span className="break-words min-w-0">{task}</span>
                           </div>
                         ))}
                       </div>
@@ -668,15 +660,15 @@
                           const isIncome = e.transactionMode === 'income';
                           const catInfo = (isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).find(c => c.name === e.type) || EXPENSE_CATEGORIES[8];
                           return (
-                            <div key={e.id} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                              <div className="flex items-center gap-3">
+                            <div key={e.id} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-xl border border-gray-100 min-w-0">
+                              <div className="flex items-center gap-3 min-w-0">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${catInfo.color}`}><img src={catInfo.icon} className="w-5 h-5" /></div>
-                                <div>
-                                  <div className="text-sm font-bold text-gray-700 leading-tight">{e.type}</div>
-                                  {e.note && <div className="text-xs text-gray-500">{e.note}</div>}
+                                <div className="min-w-0">
+                                  <div className="text-sm font-bold text-gray-700 leading-tight truncate">{e.type}</div>
+                                  {e.note && <div className="text-xs text-gray-500 truncate">{e.note}</div>}
                                 </div>
                               </div>
-                              <span className={`font-black text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>{isIncome ? '+' : '-'}${e.amount}</span>
+                              <span className={`font-black text-sm flex-shrink-0 ${isIncome ? 'text-green-600' : 'text-red-500'}`}>{isIncome ? '+' : '-'}${e.amount}</span>
                             </div>
                           );
                         })}
